@@ -28,8 +28,12 @@ int main(int argc, char* argv[]){
     listen(listening_socket, 1);
 
     for(int i=0; i<MAX_SOCKS; i++){
-        connected_socket_fds[i] = accept_handler(epoll_event_monitor_buff[i].data.fd);
-        if(connected_socket_fds[i] == -1) return -1;
+        connected_socket_fds[i] = accept_handler(listening_socket);
+        if(connected_socket_fds[i] == -1){                          //accept(non-blocking accept) returns -1, in this case set errno == EAGAIN with strerror == "resource temporarily unavailable"
+            print("ERR: accept_handler returned invalid fd")
+            print(strerror(errno));
+            return -1;
+        }
         print(connected_socket_fds[i]);
 
         epoll_event_monitor_buff[i].data.fd = connected_socket_fds[i];

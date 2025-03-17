@@ -2,6 +2,7 @@
 #include <cerrno>
 #include <cstring>
 #include <netinet/in.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 int accept_handler(int socket_fd){
@@ -11,10 +12,13 @@ int accept_handler(int socket_fd){
     socklen_t len = sizeof(is_listening);
 
     if (getsockopt(socket_fd, SOL_SOCKET, SO_ACCEPTCONN, &is_listening, &len) == -1) {
-        cout<<"DBG: start accept blocking at: "<<socket_fd<<endl;
-        return(accept(socket_fd, (struct sockaddr*) &incoming_addr_t, &len_incoming_addr_t));
+        cout<<"ERR: getsockopt: ";
+        print(strerror(errno));
+        return -1;
     }
-    return -1;
+
+    cout<<"DBG: start accept blocking at: "<<socket_fd<<endl;
+    return(accept(socket_fd, (struct sockaddr*) &incoming_addr_t, &len_incoming_addr_t));
 }
 
 
@@ -29,7 +33,7 @@ int create_listening_socket(){
     //socklen_t len_addr_t, len_incoming_addr_t; 
 
     const int enable = 1;
-    int sock_fd = socket(AF_INET, SOCK_STREAM, 0); 
+    int sock_fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0); 
     if(setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0){
         cout<<"ERR: setsockopt: ";
         print(strerror(errno));
