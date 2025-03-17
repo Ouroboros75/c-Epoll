@@ -2,6 +2,21 @@
 #include <cerrno>
 #include <cstring>
 #include <netinet/in.h>
+#include <unistd.h>
+
+int accept_handler(int socket_fd){
+    struct sockaddr_in incoming_addr_t;
+    int is_listening = 0;
+    socklen_t len_incoming_addr_t = sizeof(incoming_addr_t);
+    socklen_t len = sizeof(is_listening);
+
+    if (getsockopt(socket_fd, SOL_SOCKET, SO_ACCEPTCONN, &is_listening, &len) == -1) {
+        cout<<"DBG: start accept blocking at: "<<socket_fd<<endl;
+        return(accept(socket_fd, (struct sockaddr*) &incoming_addr_t, &len_incoming_addr_t));
+    }
+    return -1;
+}
+
 
 int create_listening_socket(){
     struct sockaddr_in addr_t, incoming_addr_t;
@@ -11,29 +26,28 @@ int create_listening_socket(){
     addr_t.sin_port   = htons(8080);
     inet_pton(AF_INET, "127.0.0.1", &(addr_t.sin_addr));
 
-    socklen_t len_addr_t, len_incoming_addr_t; 
+    //socklen_t len_addr_t, len_incoming_addr_t; 
 
+    const int enable = 1;
     int sock_fd = socket(AF_INET, SOCK_STREAM, 0); 
+    if(setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) < 0){
+        cout<<"ERR: setsockopt: ";
+        print(strerror(errno));
+        return -1;
+    } 
     if(bind(sock_fd, (struct sockaddr*) &addr_t, sizeof(addr_t)) == -1){
-        cout<<"ERR";
+        cout<<"ERR: sock bind: ";
         print(strerror(errno));
         return -1;
     }
-    listen(sock_fd, 1);
-    len_incoming_addr_t = sizeof(incoming_addr_t);
+    return sock_fd;
 
-    print("DBG: socket is listening");
-    int accepting_fd = accept(sock_fd, (struct sockaddr*) &incoming_addr_t, &len_incoming_addr_t);
-    if(accepting_fd == -1){
-        print("ERR: accept == EINVAL, check if socket is properly bound and in listening state");
-        print(EINVAL);
-        return -1;
-    }
-
+    /*
     //int flags = fcntl(accepting_fd, F_GETFL, 0);
     //fcntl(accepting_fd, F_SETFL, flags | O_NONBLOCK);
     print("DBG: succesfully bound to localhost and accepted an incoming connection");
     return accepting_fd;
+    */
 }
 
 

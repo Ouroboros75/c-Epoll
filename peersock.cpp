@@ -12,7 +12,7 @@ int main(int argc, char* argv[]){
 
     int connecting_sock_fd = create_connecting_socket();
     std::string user_input;
-    ssize_t sent_bytes;
+    //ssize_t sent_bytes;
     //unsigned char send_buffer[MAX_INPUT_LEN];
     while(1){
         safeLineParsing(&user_input, MAX_INPUT_LEN);
