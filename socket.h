@@ -4,13 +4,16 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <sys/epoll.h>
 #include <netinet/in.h>
 #include <fcntl.h>
 #include <cerrno>
 #include <cstring>
+#include <vector>
 
 using std::cout;
 using std::endl;
+using std::vector;
 
 #ifndef print
 #define print(x) cout<<x<<endl;
@@ -19,3 +22,13 @@ using std::endl;
 int create_listening_socket();
 int create_connecting_socket();
 int accept_handler(int socket_fd);
+
+/*
+struct custom_epoll_event{
+    struct epoll_event epoll_event_object;
+    custom_epoll_event(int fd, int event){
+        epoll_event_object.data.fd = fd;
+        epoll_event_object.events  = event;
+    }
+};
+*/

@@ -1,12 +1,10 @@
 #include <sys/epoll.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
 #include <iostream>
+#include <fcntl.h>
 #include "socket.h"
-
-using std::cout;
-using std::endl;
+#include <vector>
 
 #define MAX_EPOLL_BUFF_LEN  10
 #define MAX_MSG_LEN         30
@@ -18,32 +16,25 @@ using std::endl;
 
 int main(int argc, char* argv[]){
 
-    struct epoll_event epoll_event_monitor_buff[MAX_SOCKS], epoll_event_report_buff[MAX_EPOLL_BUFF_LEN];
+    vector<epoll_event> epoll_event_monitor_buff, epoll_event_report_buff;
     unsigned int connected_socket_fds[MAX_SOCKS], readies, listening_socket, is_listening = 0;
-    int epoll_instance = epoll_create1(0);
     socklen_t len = sizeof(is_listening);
+    int epoll_instance = epoll_create1(0);
     std::string rx_buffer;
 
     listening_socket = create_listening_socket();
-    listen(listening_socket, 1);
+    epoll_ctl(epoll_instance, 
+            EPOLL_CTL_ADD, 
+            listening_socket, 
+            &(epoll_event_monitor_buff.emplace_back(
+                    [listening_socket](){epoll_event x; x.data.fd=listening_socket, x.events=EPOLLIN; return x;}()))
+            );
+    epoll_event_report_buff.emplace_back();
 
-    for(int i=0; i<MAX_SOCKS; i++){
-        connected_socket_fds[i] = accept_handler(listening_socket);
-        if(connected_socket_fds[i] == -1){                          //accept(non-blocking accept) returns -1, in this case set errno == EAGAIN with strerror == "resource temporarily unavailable"
-            print("ERR: accept_handler returned invalid fd")
-            print(strerror(errno));
-            return -1;
-        }
-        print(connected_socket_fds[i]);
-
-        epoll_event_monitor_buff[i].data.fd = connected_socket_fds[i];
-        epoll_event_monitor_buff[i].events  = EPOLLIN;
-        epoll_ctl(epoll_instance, EPOLL_CTL_ADD, connected_socket_fds[i], &epoll_event_report_buff[i]);
-    }
-
-    print("DBG: ready for looping");
+    print("DBG: ready for SEGGs");
     while(1){
-        readies = epoll_wait(epoll_instance, epoll_event_report_buff, MAX_EPOLL_BUFF_LEN, 1000);
+                                             //SEGGS
+        readies = epoll_wait(epoll_instance, epoll_event_report_buff.data(), MAX_EPOLL_BUFF_LEN, -1);
         if(readies<0){
             print("ERR: epoll_wait: ");
             print(strerror(errno));
@@ -51,14 +42,21 @@ int main(int argc, char* argv[]){
         }
         sleep(1);
         for(int i=0; i<readies; i++){
-            //print(epoll_event_report_buff[i].data.fd);
-            rx_buffer.clear();
-            recv(epoll_event_report_buff[i].data.fd, rx_buffer.data(), MAX_MSG_LEN, 0);
-            print(rx_buffer.data());
+            if((epoll_event_report_buff.data() + i)->data.fd == listening_socket){
+                unsigned int accepted_sock = accept_handler(listening_socket);
+                epoll_ctl(epoll_instance, 
+                        EPOLL_CTL_ADD, 
+                        accepted_sock, 
+                        &(epoll_event_monitor_buff.emplace_back(
+                                [accepted_sock](){epoll_event x; x.data.fd=accepted_sock, x.events=EPOLLIN; return x;}()))
+                        );
+                epoll_event_report_buff.emplace_back();
+            }
+            else{
+                print("DBG: accepted socket is getting in on this");
+            }
         }
     }
 
-    
-    
     return 0;
 }
