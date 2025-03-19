@@ -9,7 +9,7 @@
 
 #define MAX_EPOLL_BUFF_LEN  10
 #define MAX_SOCKS           10
-#define MAX_MESSAGE_RW      64
+#define MAX_MESSAGE_RW      65536       //2 bytes
 
 int main(int argc, char* argv[]){
 
