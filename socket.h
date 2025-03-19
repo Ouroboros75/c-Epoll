@@ -10,10 +10,14 @@
 #include <cerrno>
 #include <cstring>
 #include <vector>
+#include <map>
 
+//move these and other common libs to an utility unit
 using std::cout;
 using std::endl;
 using std::vector;
+using std::map;
+using std::string;
 
 #ifndef print
 #define print(x) cout<<x<<endl;
