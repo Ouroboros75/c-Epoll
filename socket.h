@@ -19,3 +19,5 @@ using std::endl;
 int create_listening_socket();
 int create_connecting_socket();
 int accept_handler(int socket_fd);
+int create_sending_udp_socket();
+int create_receiving_udp_socket();

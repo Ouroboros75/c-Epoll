@@ -55,6 +55,31 @@ int create_listening_socket(){
 }
 
 
+int create_receiving_udp_socket(){
+    struct sockaddr_in addr_t, incoming_addr_t;
+    memset(&addr_t, 0, sizeof(addr_t));
+    memset(&incoming_addr_t, 0, sizeof(incoming_addr_t));
+    addr_t.sin_family = AF_INET;
+    addr_t.sin_port   = htons(8080);
+    inet_pton(AF_INET, "127.0.0.1", &(addr_t.sin_addr));
+
+    const int enable = 1;
+    int sock_fd = socket(AF_INET, SOCK_DGRAM, 0); 
+    if(bind(sock_fd, (struct sockaddr*) &addr_t, sizeof(addr_t)) == -1){
+        cout<<"ERR: sock bind: ";
+        print(strerror(errno));
+        return -1;
+    }
+    return sock_fd;
+}
+
+
+int create_sending_udp_socket(){
+    int sock_fd = socket(AF_INET, SOCK_DGRAM, 0); 
+    return sock_fd;
+}
+
+
 int create_connecting_socket(){
     struct sockaddr_in addr_t;
     memset(&addr_t, 0, sizeof(addr_t));
