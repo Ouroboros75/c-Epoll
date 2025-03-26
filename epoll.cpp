@@ -1,64 +1,63 @@
 #include <sys/epoll.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
 #include <iostream>
+#include <fcntl.h>
+#include <vector>
 #include "socket.h"
-
-using std::cout;
-using std::endl;
+#include "clients.h"
 
 #define MAX_EPOLL_BUFF_LEN  10
-#define MAX_MSG_LEN         30
 #define MAX_SOCKS           10
-
-#ifndef print
-#define print(x) cout<<x<<endl
-#endif
+#define MAX_MESSAGE_RW      65536       //2 bytes
 
 int main(int argc, char* argv[]){
 
-    struct epoll_event epoll_event_monitor_buff[MAX_SOCKS], epoll_event_report_buff[MAX_EPOLL_BUFF_LEN];
-    unsigned int connected_socket_fds[MAX_SOCKS], readies, listening_socket, is_listening = 0;
-    int epoll_instance = epoll_create1(0);
-    socklen_t len = sizeof(is_listening);
-    std::string rx_buffer;
+    vector<epoll_event> epoll_event_monitor_buff, epoll_event_report_buff;
+    unsigned int readies, listening_socket;
+    //socklen_t len = sizeof(is_listening); unsigned int connecting_sock_fd[MAX_SOCKS], is_listening = 0;
+    int epoll_instance = epoll_create1(0), fd_holder;
+    string rx_buffer;
+    clients clients_instance;   //currently empty constructor
 
     listening_socket = create_listening_socket();
-    listen(listening_socket, 1);
+    epoll_ctl(epoll_instance, 
+            EPOLL_CTL_ADD, 
+            listening_socket, 
+            &(epoll_event_monitor_buff.emplace_back(
+                    [listening_socket](){epoll_event x; x.data.fd=listening_socket, x.events=EPOLLIN; return x;}()))
+            );
+    epoll_event_report_buff.emplace_back();
 
-    for(int i=0; i<MAX_SOCKS; i++){
-        connected_socket_fds[i] = accept_handler(listening_socket);
-        if(connected_socket_fds[i] == -1){                          //accept(non-blocking accept) returns -1, in this case set errno == EAGAIN with strerror == "resource temporarily unavailable"
-            print("ERR: accept_handler returned invalid fd")
-            print(strerror(errno));
-            return -1;
-        }
-        print(connected_socket_fds[i]);
-
-        epoll_event_monitor_buff[i].data.fd = connected_socket_fds[i];
-        epoll_event_monitor_buff[i].events  = EPOLLIN;
-        epoll_ctl(epoll_instance, EPOLL_CTL_ADD, connected_socket_fds[i], &epoll_event_report_buff[i]);
-    }
-
-    print("DBG: ready for looping");
+    print("DBG: ready for SEGGs");
     while(1){
-        readies = epoll_wait(epoll_instance, epoll_event_report_buff, MAX_EPOLL_BUFF_LEN, 1000);
+        readies = epoll_wait(epoll_instance, epoll_event_report_buff.data(), MAX_EPOLL_BUFF_LEN, -1);
         if(readies<0){
             print("ERR: epoll_wait: ");
             print(strerror(errno));
             return -1;
         }
-        sleep(1);
         for(int i=0; i<readies; i++){
-            //print(epoll_event_report_buff[i].data.fd);
-            rx_buffer.clear();
-            recv(epoll_event_report_buff[i].data.fd, rx_buffer.data(), MAX_MSG_LEN, 0);
-            print(rx_buffer.data());
+            fd_holder = (epoll_event_report_buff.data() + i)->data.fd;
+            if(fd_holder == listening_socket){
+                unsigned int accepted_sock = accept_handler(listening_socket);
+                epoll_ctl(epoll_instance, 
+                        EPOLL_CTL_ADD, 
+                        accepted_sock, 
+                        &(epoll_event_monitor_buff.emplace_back(
+                                [accepted_sock](){epoll_event x; x.data.fd=accepted_sock, x.events=EPOLLIN; return x;}()))
+                        );
+                epoll_event_report_buff.emplace_back();     //sole purpose is add another empty element to the vector for reporting
+                clients_instance.insert(accepted_sock);
+            }
+            else{
+                while(read(fd_holder, clients_instance.get_buffer(fd_holder), MAX_MESSAGE_RW) != 0);
+                //use a switch on read()'s result
+                clients_instance.rename(fd_holder);
+                cout<<"DBG: connected fd "<<fd_holder<<" for client "<<clients_instance.get_name(fd_holder)<<endl;
+            }
         }
     }
 
-    
-    
     return 0;
 }
