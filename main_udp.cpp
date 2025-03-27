@@ -1,34 +1,110 @@
+#include <bits/types/FILE.h>
+#include <cstdint>
 #include <netinet/in.h>
 #include <sys/epoll.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <iostream>
+#include <filesystem>
 #include "socket.h"
+
+//#define PACKET_SIZE 65536-28
+#define MTU                 1500
+#define CUSTOM_HEADER_SIZE  4               //2bytes seq, 2bytes total
+#define PACKET_SIZE         (MTU-28)
+#define FILE_TO_SEND        "./file_send"
+
+//--------------------------------------------------------------------------
+constexpr std::array<uint32_t, 256> generate_crc32_table() {
+    std::array<uint32_t, 256> table{};
+    for (uint32_t i = 0; i < 256; i++) {
+        uint32_t crc = i;
+        for (uint32_t j = 0; j < 8; j++) {
+            crc = (crc >> 1) ^ (0xEDB88320u & -(crc & 1));
+        }
+        table[i] = crc;
+    }
+    return table;
+}
+
+// Precomputed table at compile-time (C++20 `consteval` is also possible)
+constexpr auto crc32_table = generate_crc32_table();
+
+constexpr uint32_t crc32(std::string_view data, uint32_t crc = 0xFFFFFFFF) {
+    for (unsigned char byte : data) {
+        crc = (crc >> 8) ^ crc32_table[(crc ^ byte) & 0xFF];
+    }
+    return crc ^ 0xFFFFFFFF; // Final XOR
+}
+//--------------------------------------------------------------------------
+
 
 int main(int argc, char* argv[]){
 
     if(argc > 1){
-        unsigned char tempBuff[15];
+        unsigned char tempBuff[PACKET_SIZE+4];
         cout << "is server" << endl;
         int receiving_socket = create_receiving_udp_socket();
-        size_t received = recv(receiving_socket, tempBuff, 15, 0);
-        //listen(receiving_socket, 1);
-        cout << "got " << received << " bytes" << endl;
-        cout << tempBuff << endl;
+        uint32_t seq = 0, total = 0, old_seq = 0;
 
+        while(1){
+            int received = recv(receiving_socket, 
+                                    tempBuff, 
+                                    PACKET_SIZE, 
+                                    0);
+            if(received<1) continue;
+            //seq = *(uint32_t*)(&tempBuff[0]); total = *(uint32_t*)(&tempBuff[4]);
+            std::memcpy(&seq, &tempBuff[0], sizeof(seq));
+            //cout << "got " << received << " bytes || seq " << seq << "/" << total << endl;
+            if(seq - old_seq != 1){
+                cout << seq << " vs " << old_seq << ": OUT OF ORDER / LIKELY PACKET'S LOST" << endl;
+            }
+            old_seq = seq;
+            if(received < PACKET_SIZE){
+                cout << "RECEIVED ALL?" << endl;
+                break;
+            }
+        }
+        
     }
     else{
         struct sockaddr_in addr_t;
         memset(&addr_t, 0, sizeof(addr_t));
         addr_t.sin_family = AF_INET;
         addr_t.sin_port   = htons(8080);
-        inet_pton(AF_INET, "127.0.0.1", &(addr_t.sin_addr));
-
-        unsigned char sendBuff[30] = "i saw the writing on the wall";
-        cout << "is sender" << endl;
+        inet_pton(AF_INET, "192.168.1.11", &(addr_t.sin_addr));
+        //inet_pton(AF_INET, "127.0.0.1", &(addr_t.sin_addr));
         int sending_socket = create_sending_udp_socket();
-        sendto(sending_socket, sendBuff, 30, 0, (sockaddr*) &addr_t, sizeof(addr_t));
+        cout << "is sender" << endl;
+
+        //file handling        
+        unsigned char sendBuff[PACKET_SIZE+4];
+        uint32_t* sendBuff32_ptr = reinterpret_cast<uint32_t*>(sendBuff);
+        uint32_t fd_file_size = std::filesystem::file_size(FILE_TO_SEND), fd_read_bytes = 0;
+        uint32_t seq = 1, total = (fd_file_size/PACKET_SIZE) + (fd_file_size % PACKET_SIZE != 0);
+        int fd_to_send = open(FILE_TO_SEND, O_RDONLY); 
+        cout << "File size: " << fd_file_size << " bytes || total packets == " << total << endl;
+
+        while(1){
+            fd_read_bytes = read(fd_to_send, (sendBuff+4), PACKET_SIZE);
+            sendBuff32_ptr[0] = seq++; sendBuff32_ptr[1] = total;
+            sendto(sending_socket, 
+                    sendBuff, 
+                    fd_read_bytes, 
+                    0, 
+                    (sockaddr*) &addr_t, 
+                    sizeof(addr_t));
+
+            for(int i=0; i<32000; i++){}
+            //usleep(1);
+
+            if(fd_read_bytes < PACKET_SIZE){
+                cout << "DONE!" << endl;
+                close(fd_to_send);
+                break;
+            }
+        }
     }
 
     return 0;

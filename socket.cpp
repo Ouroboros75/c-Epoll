@@ -58,14 +58,21 @@ int create_receiving_udp_socket(){
     memset(&incoming_addr_t, 0, sizeof(incoming_addr_t));
     addr_t.sin_family = AF_INET;
     addr_t.sin_port   = htons(8080);
-    inet_pton(AF_INET, "127.0.0.1", &(addr_t.sin_addr));
+    inet_pton(AF_INET, "0.0.0.0", &(addr_t.sin_addr));
+    //inet_pton(AF_INET, "127.0.0.1", &(addr_t.sin_addr));
 
     const int enable = 1;
-    int sock_fd = socket(AF_INET, SOCK_DGRAM, 0); 
+    int sock_fd = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0); 
+    //int sock_fd = socket(AF_INET, SOCK_DGRAM, 0); 
     if(bind(sock_fd, (struct sockaddr*) &addr_t, sizeof(addr_t)) == -1){
         cout<<"ERR: sock bind: ";
         print(strerror(errno));
         return -1;
+    }
+    // Set receive buffer size
+    int buf_size = 200 * 1024 * 1024;
+    if (setsockopt(sock_fd, SOL_SOCKET, SO_RCVBUF, &buf_size, sizeof(buf_size)) < 0) {
+        perror("Error setting receive buffer size");
     }
     return sock_fd;
 }
@@ -73,6 +80,12 @@ int create_receiving_udp_socket(){
 
 int create_sending_udp_socket(){
     int sock_fd = socket(AF_INET, SOCK_DGRAM, 0); 
+    // Set send buffer size
+    int buf_size = 200 * 1024 * 1024;
+    if (setsockopt(sock_fd, SOL_SOCKET, SO_SNDBUF, &buf_size, sizeof(buf_size)) < 0) {
+        perror("Error setting send buffer size");
+    }
+
     return sock_fd;
 }
 
