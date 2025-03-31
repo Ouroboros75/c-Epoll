@@ -59,9 +59,9 @@ int create_receiving_udp_socket(){
     addr_t.sin_family = AF_INET;
     addr_t.sin_port   = htons(8080);
     inet_pton(AF_INET, "0.0.0.0", &(addr_t.sin_addr));
+    //inet_pton(AF_INET, "192.168.1.199", &(addr_t.sin_addr));
     //inet_pton(AF_INET, "127.0.0.1", &(addr_t.sin_addr));
 
-    const int enable = 1;
     int sock_fd = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, 0); 
     //int sock_fd = socket(AF_INET, SOCK_DGRAM, 0); 
     if(bind(sock_fd, (struct sockaddr*) &addr_t, sizeof(addr_t)) == -1){
