@@ -1,4 +1,5 @@
 #include <bits/types/FILE.h>
+#include <chrono>
 #include <cstdint>
 #include <time.h>
 #include <filesystem>
@@ -22,6 +23,9 @@ char* handover_ptr;
 unsigned int main_bytes = 0;
 int startup = 0;
 pthread_spinlock_t spinlock;
+auto start    = high_resolution_clock::now();
+auto end      = high_resolution_clock::now();
+auto delta_ns = duration_cast<nanoseconds>(end - start).count();
 
 
 void* reader_thread(void*) {
@@ -82,7 +86,13 @@ int main(int argc, char* argv[]){
                 std::memcpy(&main_side[main_bytes], &tempBuff[8], (received-8));
                 main_bytes += received - 8;
                 if(main_bytes == BUFFER_SIZE){
-                    pthread_spin_lock(&spinlock); 
+
+                    start = high_resolution_clock::now();
+                    pthread_spin_lock(&spinlock); //pin down//
+                    end = high_resolution_clock::now();
+                    delta_ns = duration_cast<nanoseconds>(end - start).count();
+                    cout << delta_ns << endl;
+
                     //-//
                     handover_ptr = main_side;
                     main_side    = thread_side;

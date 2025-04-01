@@ -11,6 +11,8 @@
 #include <cstring>
 #include <vector>
 #include <map>
+//
+#include <chrono>
 
 
 //move these and other common libs to an utility unit
@@ -19,6 +21,7 @@ using std::endl;
 using std::vector;
 using std::map;
 using std::string;
+using namespace std::chrono;
 
 #ifndef print
 #define print(x) cout<<x<<endl;
